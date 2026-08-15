@@ -1,0 +1,70 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: light;
+}
+
+html,
+body {
+  background-color: #f1ead8;
+  background-image:
+    radial-gradient(circle at 1px 1px, rgba(27, 27, 31, 0.07) 1px, transparent 0);
+  background-size: 18px 18px;
+}
+
+body {
+  font-family: 'IBM Plex Sans', system-ui, sans-serif;
+  color: #1b1b1f;
+}
+
+h1, h2, h3, h4 {
+  font-family: 'Space Grotesk', system-ui, sans-serif;
+  letter-spacing: -0.01em;
+}
+
+/* --- Motivo de "canhoto de ingresso" (ticket stub) ---------------------
+   Decisão de design: em vez do cartão com sombra suave + cantos muito
+   arredondados (o visual que qualquer gerador de UI produz hoje), a marca
+   do produto é o ingresso físico de bilheteria: borda grossa sólida,
+   sombra "dura" deslocada (sem blur) e uma faixa perfurada picotada entre
+   o corpo do ingresso e o canhoto com o QR/código. */
+.ticket-perforation {
+  position: relative;
+  border-left: 2px dashed rgba(27, 27, 31, 0.35);
+}
+
+.ticket-perforation::before,
+.ticket-perforation::after {
+  content: '';
+  position: absolute;
+  left: -11px;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: #f1ead8;
+  border: 2px solid #1b1b1f;
+}
+
+.ticket-perforation::before {
+  top: -12px;
+}
+
+.ticket-perforation::after {
+  bottom: -12px;
+}
+
+.stub-shadow {
+  box-shadow: 5px 5px 0 0 #1b1b1f;
+}
+
+.scanline {
+  background: repeating-linear-gradient(
+    to bottom,
+    rgba(78, 147, 196, 0.35) 0px,
+    rgba(78, 147, 196, 0.35) 2px,
+    transparent 2px,
+    transparent 5px
+  );
+}

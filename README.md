@@ -1,0 +1,189 @@
+# Eventus — Plataforma de Eventos e Ingressos
+
+Desafio técnico da Verzel (Desafio Elite Dev). Organizador monta eventos a partir de um
+catálogo externo, cliente reserva e paga (de forma simulada) e recebe um ingresso com QR,
+portaria valida na entrada.
+
+> Uso de IA neste projeto: documentado em [`docs/AI_USAGE.md`](docs/AI_USAGE.md), como pedido
+> no desafio. Leia antes de avaliar decisões que pareçam estranhas à primeira vista — a maioria
+> tem uma razão explicada lá ou nas seções "Decisões" abaixo.
+
+## Stack
+
+| Camada       | Escolha                                             |
+|--------------|------------------------------------------------------|
+| Front-end    | React 19 + TypeScript + Vite + React Router + Tailwind CSS |
+| Back-end     | NestJS + TypeORM + PostgreSQL                        |
+| Autenticação | JWT (passport-jwt), 3 papéis: ORGANIZER, CLIENT, GATE |
+| Catálogo     | Ticketmaster Discovery API (com fallback local)       |
+| QR           | `qrcode` (geração) + `html5-qrcode` (leitura por câmera) |
+
+Por que **TypeORM** em vez de Prisma: Gosto de utilizar o prisma mas nesse projeto em especifico achei melhor o TypeORM por já ter feito algo parecido usando ele e ter mais experiência, então foi bem mais rápido e consegui resultados melhores por conta dessa facilidade.
+
+## Estrutura
+
+```
+.
+├── backend/     # API NestJS (REST, prefixo /api)
+├── frontend/    # SPA React (Vite)
+├── docker-compose.yml   # Postgres para desenvolvimento
+└── docs/
+    └── AI_USAGE.md
+```
+
+## Como rodar
+
+### Pré-requisitos
+
+- Node.js 20+
+- Docker (para o Postgres) **ou** um PostgreSQL 14+ já rodando localmente
+
+### 1. Banco de dados
+
+Com Docker:
+
+```bash
+docker compose up -d
+```
+
+Isso sobe um Postgres em `localhost:5432` com usuário/senha/banco `eventos` — já compatível com
+o `.env.example` do backend. Sem Docker, crie manualmente um banco com essas credenciais (ou
+edite `backend/.env` para apontar para o seu Postgres):
+
+```sql
+CREATE USER eventos WITH PASSWORD 'eventos';
+CREATE DATABASE eventos OWNER eventos;
+```
+
+### 2. Back-end
+
+```bash
+cd backend
+cp .env.example .env
+npm install
+npm run seed       # popula organizador, 2 clientes, portaria e 2 eventos com ingressos
+npm run start:dev  # http://localhost:3000/api
+```
+
+`synchronize: true` está ativo no TypeORM (ver `src/app.module.ts`) — o schema é criado
+automaticamente na primeira conexão, sem precisar rodar migrations manualmente. É uma escolha
+deliberada para o prazo do desafio; **não é o que eu faria em produção** (lá eu geraria
+migrations versionadas com `typeorm migration:generate`).
+
+### 3. Front-end
+
+Em outro terminal:
+
+```bash
+cd frontend
+cp .env.example .env
+npm install
+npm run dev   # http://localhost:5173
+```
+
+O front espera a API em `VITE_API_URL` (padrão `http://localhost:3000/api`, já no
+`.env.example`).
+
+### 4. Ticketmaster Discovery API (opcional)
+
+Sem chave, o organizador vê um catálogo local de 3 itens de exemplo ao montar um evento — o
+fluxo completo funciona sem depender de uma chave externa. Para usar o catálogo real:
+
+1. Crie uma chave em https://developer.ticketmaster.com/
+2. Coloque em `backend/.env`: `TICKETMASTER_API_KEY=sua-chave`
+3. Reinicie o backend
+
+## Credenciais de teste (semeadas pelo `npm run seed`)
+
+| Papel        | E-mail                  | Senha      |
+|--------------|--------------------------|------------|
+| Organizador  | organizador@demo.com     | senha123   |
+| Cliente 1    | cliente1@demo.com        | senha123   |
+| Cliente 2    | cliente2@demo.com        | senha123   |
+| Portaria     | portaria@demo.com        | senha123   |
+
+O seed já deixa publicado:
+- **Sessão Especial: Filme Demo** (São Paulo, mapa de assentos 5×8) — 2 assentos já vendidos e
+  com ingresso emitido para `cliente1`, para dar para testar a portaria sem passar pelo checkout.
+- **Show Demo: Noite Eletrônica** (Rio de Janeiro, pista/quantidade) — 2 ingressos de pista já
+  emitidos para `cliente2`.
+
+Os códigos exatos dos ingressos de demonstração aparecem no terminal ao rodar `npm run seed`
+(mudam a cada execução, já que o código é aleatório).
+
+## Roteiro rápido para avaliar
+
+1. Entre como `cliente2@demo.com` → Eventos → "Show Demo: Noite Eletrônica" → escolha uma
+   quantidade → reservar → pague com qualquer cartão que **não** termine em `0000` (aprovado) ou
+   termine em `0000` (recusado, para ver o fluxo de recusa) → "Meus ingressos" mostra o QR.
+2. Entre como `cliente1@demo.com` → "Sessão Especial: Filme Demo" → escolha 1-2 assentos no mapa
+   (os já vendidos aparecem cinza/bloqueados) → mesmo fluxo de pagamento.
+3. Entre como `portaria@demo.com` → selecione o evento → digite manualmente o código de um
+   ingresso válido (aparece em "Meus ingressos" do cliente correspondente, ou no log do seed) →
+   veja `INGRESSO VÁLIDO` → valide de novo → veja `JÁ UTILIZADO`. Tente também validar um
+   ingresso do evento errado (selecione o outro evento no dropdown) → `EVENTO ERRADO`. Com
+   câmera disponível (celular/notebook com webcam, servido por HTTPS ou localhost), o botão
+   "Ler QR pela câmera" também funciona — abra "Meus ingressos" em outro dispositivo e aponte a
+   câmera para o QR.
+4. Entre como `organizador@demo.com` → "Painel do organizador" → "+ Novo evento" → busque no
+   catálogo (ou pule para o formulário manual) → publique.
+
+## Decisões de produto e design
+
+**Identidade visual — canhoto de ingresso, não "SaaS genérico".** Em vez do visual que qualquer
+gerador de UI produz hoje (cards com sombra suave e blur, gradiente azul/violeta, `Inter`
+em tudo), a marca do produto é o ingresso físico de bilheteria de cinema: bordas grossas
+sólidas, sombra "dura" deslocada (sem blur), faixa de perfuração pontilhada com círculos entre o
+corpo do ingresso e o canhoto do QR. Paleta dourado-bilheteria (`marquee`) + tinta (`ink`) +
+papel (`paper`), com verde/vermelho de carimbo para os estados de validação — reforça a metáfora
+sem precisar de mais texto. Tipografia em três camadas: `Space Grotesk` para títulos (geométrica,
+com personalidade), `IBM Plex Sans` para texto corrido (legível, mas não o `Inter` que aparece em
+95% das interfaces geradas por IA), `IBM Plex Mono` para códigos/preços/assentos (reforça a
+sensação de "sistema de bilheteria").
+
+**Mapa de assentos simplificado (fileiras × poltronas).** Um editor de mapa de assentos livre
+(camarotes, curvas, setores irregulares) é o tipo de feature que consome dias sem agregar ao que
+o desafio realmente avalia — o fluxo de concorrência ponta a ponta. Optei por um mapa gerado
+automaticamente (fileiras A, B, C… × N poltronas), que já é suficiente para mostrar seleção,
+hold, pagamento e bloqueio de concorrência.
+
+**Bloqueio de concorrência com lock pessimista, não SERIALIZABLE.** A garantia de "mesmo
+assento não vendido duas vezes" vem de `SELECT ... FOR UPDATE` explícito nas linhas do
+assento (ou do evento, no caso de pista) dentro de uma transação — não do nível de isolamento.
+Cheguei a testar com isolamento `SERIALIZABLE` por cima do lock explícito, e o Postgres passou a
+lançar `could not serialize access due to read/write dependencies` num response 500 cru, em vez
+do 409 claro que o lock pessimista já garantia sozinho. Removi o `SERIALIZABLE` — dois
+mecanismos de exclusão mútua empilhados só trocaram uma mensagem de erro legível por uma
+confusa. Testado com 5 requisições concorrentes pelo mesmo assento: 1 sucesso, 4 recusas limpas
+(ver `backend/src/reservations/reservations.service.ts`).
+
+**Hold de 10 minutos com expiração automática.** Sem isso, um cliente que abandona o checkout
+deixaria o assento (ou vaga de pista) preso para sempre. Um cron (`@nestjs/schedule`, a cada
+minuto) devolve ao estoque reservas pendentes cujo prazo expirou.
+
+**QR não forjável via HMAC, não apenas código aleatório.** O código do ingresso já tem entropia
+alta (10 caracteres, ~50 bits, alfabeto sem caracteres ambíguos para digitação manual). O QR
+carrega adicionalmente uma assinatura HMAC-SHA256 de `id+eventId+code`, calculada com um
+segredo que só o servidor conhece. A portaria valida a assinatura *antes* de consultar o banco —
+um QR com o campo alterado é rejeitado imediatamente como forjado, sem round-trip. Ver
+`backend/src/tickets/ticket-signature.util.ts` e `backend/src/gate/gate.service.ts`.
+
+**Cadastro público só para clientes.** Organizador e portaria são provisionados (seed), não se
+autocadastram por formulário público — como funciona em Sympla/Eventim, onde produtor e equipe
+de portaria são contas geridas pela operação, não autoatendimento.
+
+**Cartão de teste recusado por convenção, não aleatório.** Números terminados em `0000` são
+sempre recusados; qualquer outro número aprova. Decisão simples e determinística para poder
+testar (e para você conseguir reproduzir) o fluxo de recusa exigido no desafio, sem simular
+gateway de pagamento real.
+
+**JWT em localStorage, não cookie httpOnly.** Mais simples de implementar dado o prazo, mas
+tecnicamente mais exposto a XSS do que um cookie httpOnly + CSRF token. Limitação conhecida,
+registrada aqui em vez de escondida.
+
+
+## Dados sensíveis
+
+Os arquivos `.env` **não** estão versionados (`.gitignore`). Use os `.env.example` de
+`backend/` e `frontend/` como referência — os valores padrão já funcionam para rodar localmente
+com o `docker-compose.yml` incluso.
