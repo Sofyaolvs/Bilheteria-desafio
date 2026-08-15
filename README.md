@@ -133,7 +133,30 @@ garante isso — o cron só dispara enquanto uma invocação estiver "quente", e
 pendentes podem não expirar sozinhas em produção no Vercel. Para esse cron funcionar de verdade,
 o ideal é um [Vercel Cron Job](https://vercel.com/docs/cron-jobs) batendo numa rota HTTP que
 expira os holds manualmente, ou hospedar o backend em uma plataforma com processo persistente
-(Railway, Render, Fly.io) — não implementado aqui por estar fora do escopo do desafio.
+(Railway, Render, Fly.io) — ver opção abaixo.
+
+### 6. Deploy do back-end no Render (alternativa recomendada)
+
+Ao contrário do Vercel, o Render roda um processo Node persistente — não precisa do handler em
+`backend/api/index.ts` nem do `vercel.json`, o `main.ts` com `app.listen()` funciona direto, e
+o cron de expiração de hold (limitação do Vercel, acima) roda normalmente. Ao criar o Web
+Service, aponte para este repositório e preencha:
+
+| Campo | Valor |
+|---|---|
+| Root Directory | `backend` |
+| Build Command | `npm install && npm run build` (o projeto usa `package-lock.json`, não `yarn.lock` — troque o `yarn` do valor padrão) |
+| Start Command | `npm run start:prod` |
+
+Em **Environment**, adicione as mesmas variáveis do `backend/.env.example` (`DATABASE_URL`,
+`JWT_SECRET`, `JWT_EXPIRES_IN`, `TICKET_QR_SECRET`, `TICKETMASTER_API_KEY`, `FRONTEND_URL`) —
+não é preciso configurar `PORT`, o Render injeta essa variável e o `main.ts` já lê
+`process.env.PORT`. O `DATABASE_URL` vale a mesma regra do Vercel: precisa ser um Postgres
+acessível pela internet, não o `localhost` do `docker-compose.yml`. Se criar um Postgres no
+próprio Render na mesma região do Web Service, dá pra usar a Internal Database URL dele.
+
+Por fim, aponte `VITE_API_URL` do front (no Vercel) para `https://<seu-serviço>.onrender.com/api`
+— com `/api` no final, mesma regra da seção anterior — e faça redeploy do front.
 
 ## Credenciais de teste (semeadas pelo `npm run seed`)
 
