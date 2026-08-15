@@ -108,10 +108,24 @@ Ao criar o projeto no Vercel, aponte o **Root Directory** para `backend/` e conf
 variáveis de ambiente do `.env.example` (`DATABASE_URL`, `JWT_SECRET`, `TICKET_QR_SECRET`, etc.)
 nas configurações do projeto — elas não vêm do `.env` local, que não é versionado.
 
-Se o `DATABASE_URL` apontar para um Postgres gerenciado (Neon, Supabase, Railway...) em vez de
-`localhost`, o backend liga TLS automaticamente na conexão (ver `isManagedPostgres` em
-`backend/src/app.module.ts`) — sem isso a conexão cai e a function crasha com
-`FUNCTION_INVOCATION_FAILED` antes mesmo de responder a primeira rota.
+O `DATABASE_URL` precisa apontar para um Postgres **acessível pela internet** (Neon, Supabase,
+Railway...) — o Postgres do `docker-compose.yml` roda só na sua máquina (`localhost`), e a
+function do Vercel roda na nuvem deles, então não enxerga esse banco de jeito nenhum. Quando o
+host não é `localhost`, o backend liga TLS automaticamente na conexão (ver `isManagedPostgres`
+em `backend/src/app.module.ts`), porque bancos gerenciados normalmente exigem isso.
+
+Se a variável estiver ausente/errada, a function crasha com `FUNCTION_INVOCATION_FAILED` antes
+de responder qualquer rota — e como o crash acontece antes do Nest aplicar CORS, o navegador
+mostra um erro de "bloqueado por CORS" no front, escondendo o 500 real. `backend/api/index.ts`
+captura esse erro e responde com CORS + uma mensagem JSON explicando a causa, em vez de deixar o
+crash cru; o log de causa completo (stack trace) fica na aba **Logs** da function no painel do
+Vercel.
+
+No front, `VITE_API_URL` (configurado no projeto Vercel do `frontend/`) precisa terminar em
+`/api` — é o prefixo global que o Nest usa (`app.setGlobalPrefix('api')` em
+`backend/src/bootstrap.ts`). Apontar para a raiz do domínio do backend, sem `/api`, faz toda
+rota cair em 404. Variáveis do Vite são embutidas no build, então depois de mudar
+`VITE_API_URL` é preciso fazer um novo deploy do front (redeploy), não só salvar a variável.
 
 **Limitação conhecida:** o cron de expiração de hold (`@nestjs/schedule`, a cada minuto, ver
 `backend/src/reservations/`) depende de um processo rodando continuamente. Serverless não
