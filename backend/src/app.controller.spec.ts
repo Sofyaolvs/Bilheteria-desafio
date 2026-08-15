@@ -15,8 +15,11 @@ describe('AppController', () => {
   });
 
   describe('root', () => {
-    it('should return "Hello World!"', () => {
-      expect(appController.getHello()).toBe('Hello World!');
+    it('should return API status', () => {
+      expect(appController.getHello()).toEqual({
+        status: 'ok',
+        service: 'Plataforma de Eventos e Ingressos API',
+      });
     });
   });
 });

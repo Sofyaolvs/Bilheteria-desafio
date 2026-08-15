@@ -1,11 +1,12 @@
 import { type FormEvent, useEffect, useState } from 'react';
-import { Link, useParams } from 'react-router-dom';
+import { Link, useNavigate, useParams } from 'react-router-dom';
 import { api, apiErrorMessage } from '../lib/api';
 import type { Reservation } from '../types';
 import { formatBRL } from '../lib/format';
 
 export function Checkout() {
   const { id } = useParams<{ id: string }>();
+  const navigate = useNavigate();
   const [reservation, setReservation] = useState<Reservation | null>(null);
   const [cardHolder, setCardHolder] = useState('');
   const [cardNumber, setCardNumber] = useState('');
@@ -15,6 +16,7 @@ export function Checkout() {
   const [declined, setDeclined] = useState(false);
   const [success, setSuccess] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [cancelling, setCancelling] = useState(false);
   const [secondsLeft, setSecondsLeft] = useState<number | null>(null);
 
   useEffect(() => {
@@ -54,6 +56,19 @@ export function Checkout() {
       setError(apiErrorMessage(err, 'Não foi possível processar o pagamento.'));
     } finally {
       setLoading(false);
+    }
+  }
+
+  async function onCancel() {
+    if (!id) return;
+    setCancelling(true);
+    setError('');
+    try {
+      await api.delete(`/reservations/${id}`);
+      navigate(reservation?.eventId ? `/eventos/${reservation.eventId}` : '/');
+    } catch (err) {
+      setError(apiErrorMessage(err, 'Não foi possível cancelar a reserva.'));
+      setCancelling(false);
     }
   }
 
@@ -159,10 +174,19 @@ export function Checkout() {
           {error && <p className="text-sm font-medium text-stamp">{error}</p>}
 
           <button
-            disabled={loading}
+            disabled={loading || cancelling}
             className="stub-shadow border-2 border-ink bg-marquee px-4 py-2 font-display font-semibold hover:bg-marquee-dark disabled:opacity-60"
           >
             {loading ? 'Processando…' : `Pagar ${formatBRL(reservation.totalPrice)}`}
+          </button>
+
+          <button
+            type="button"
+            onClick={onCancel}
+            disabled={loading || cancelling}
+            className="text-sm font-medium text-ink/60 underline hover:text-stamp disabled:opacity-60"
+          >
+            {cancelling ? 'Cancelando…' : 'Cancelar reserva e liberar o(s) lugar(es)'}
           </button>
         </form>
       )}

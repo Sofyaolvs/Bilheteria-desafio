@@ -9,11 +9,6 @@ interface AuthState {
   logout: () => void;
 }
 
-// Guardamos o JWT no localStorage (via zustand/persist) em vez de um cookie
-// httpOnly. Decisão consciente para o prazo do desafio: cookie httpOnly
-// seria mais resistente a XSS, mas exigiria CSRF token + configuração de
-// cookies cross-origin entre front (Vite) e back (Nest). Documentado no
-// README como limitação conhecida.
 export const useAuthStore = create<AuthState>()(
   persist(
     (set) => ({

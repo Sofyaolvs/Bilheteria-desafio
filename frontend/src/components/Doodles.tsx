@@ -1,11 +1,5 @@
 import type { SVGProps } from 'react';
 
-/**
- * Doodles à mão-livre — reforçam o motivo "canhoto de ingresso" com traços
- * imperfeitos (propositalmente não retos), em vez do ícone vetorial limpo
- * que qualquer UI gerada por IA usa hoje. currentColor herda a cor do texto.
- */
-
 export function DoodleStar(props: SVGProps<SVGSVGElement>) {
   return (
     <svg viewBox="0 0 40 40" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>

@@ -7,12 +7,6 @@ interface Props {
   maxSelectable?: number;
 }
 
-// Mapa simplificado por fileiras x poltronas (como uma sala de cinema
-// convencional). Decisão registrada no README: um editor de mapa livre
-// (formatos de teatro, curvas, camarotes) ficaria fora do orçamento de
-// 7 dias sem comprometer o resto do fluxo — aqui o valor está em mostrar o
-// conceito ponta a ponta (seleção → hold → pagamento → bloqueio de
-// concorrência), não em um editor de mapas genérico.
 export function SeatMap({ seats, selected, onToggle, maxSelectable = 8 }: Props) {
   const rows = Array.from(new Set(seats.map((s) => s.row))).sort();
 

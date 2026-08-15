@@ -24,12 +24,6 @@ h1, h2, h3, h4 {
   letter-spacing: -0.01em;
 }
 
-/* --- Motivo de "canhoto de ingresso" (ticket stub) ---------------------
-   Decisão de design: em vez do cartão com sombra suave + cantos muito
-   arredondados (o visual que qualquer gerador de UI produz hoje), a marca
-   do produto é o ingresso físico de bilheteria: borda grossa sólida,
-   sombra "dura" deslocada (sem blur) e uma faixa perfurada picotada entre
-   o corpo do ingresso e o canhoto com o QR/código. */
 .ticket-perforation {
   position: relative;
   border-left: 2px dashed rgba(27, 27, 31, 0.35);

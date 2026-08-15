@@ -11,8 +11,7 @@ export class AuthService {
   ) {}
 
   // Auto-cadastro é permitido só para Clientes. Organizador e Portaria são
-  // provisionados por quem já opera a plataforma (ver seed) — mesma lógica
-  // de Sympla/Eventim, onde produtor e equipe de portaria não se cadastram
+  // feitas pelo seed mesma lógica de Sympla/Eventim, onde produtor e equipe de portaria não se cadastram
   // sozinhos por um formulário público.
   async registerClient(name: string, email: string, password: string) {
     const existing = await this.usersService.findByEmail(email);

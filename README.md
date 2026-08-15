@@ -195,52 +195,59 @@ Os códigos exatos dos ingressos de demonstração aparecem no terminal ao rodar
 
 ## Decisões de produto e design
 
-**Identidade visual — canhoto de ingresso.** A marca do produto é o ingresso físico de
-bilheteria de cinema: bordas grossas sólidas, sombra "dura" deslocada (sem blur), faixa de
-perfuração pontilhada com círculos entre o corpo do ingresso e o canhoto do QR. Paleta
-dourado-bilheteria (`marquee`) + tinta (`ink`) + papel (`paper`), com verde/vermelho de carimbo
-para os estados de validação. Tipografia em três camadas: `Space Grotesk` para títulos,
-`IBM Plex Sans` para texto corrido, `IBM Plex Mono` para códigos/preços/assentos.
+**Por que o visual é de canhoto de ingresso de cinema.** Não queria a cara de "gerado por IA":
+card com aquele modelo que todo mundo já conhece, fui pro lado oposto, borda grossa, sombra forte (sem blur nenhum) e aquela
+fileira de furinhos entre o corpo do ingresso e o canhoto do QR, como um ticket físico de
+bilheteria mesmo. Paleta dourado de marquise (`marquee`) + tinta (`ink`) + papel (`paper`), com
+verde/vermelho de carimbo pros estados de validação. E três fontes fazendo papéis diferentes:
+`Space Grotesk` nos títulos, `IBM Plex Sans` no texto corrido, `IBM Plex Mono` em código/preço/
+assento — qualquer coisa que pareça um "dado", não um enfeite.
 
-**Mapa de assentos simplificado (fileiras × poltronas).** Um editor de mapa de assentos livre
-(camarotes, curvas, setores irregulares) é o tipo de feature que consome dias sem agregar ao que
-o desafio realmente avalia — o fluxo de concorrência ponta a ponta. Optei por um mapa gerado
-automaticamente (fileiras A, B, C… × N poltronas), que já é suficiente para mostrar seleção,
-hold, pagamento e bloqueio de concorrência.
+**O mapa de assentos é só fileira × poltrona, de propósito.** Dava pra construir um editor de
+mapa livre, com camarote, curva, setor irregular... mas isso ia consumir dias que eu preferia
+gastar no que o desafio realmente cobra: o fluxo de concorrência funcionando ponta a ponta. Um
+mapa gerado automaticamente (fileiras A, B, C... por N poltronas) já mostra seleção, hold,
+pagamento e bloqueio de concorrência igualmente bem — não faria diferença pra avaliação ter um
+editor bonito por trás.
 
-**Bloqueio de concorrência com lock pessimista, não SERIALIZABLE.** A garantia de "mesmo
-assento não vendido duas vezes" vem de `SELECT ... FOR UPDATE` explícito nas linhas do
-assento (ou do evento, no caso de pista) dentro de uma transação — não do nível de isolamento.
-Cheguei a testar com isolamento `SERIALIZABLE` por cima do lock explícito, e o Postgres passou a
-lançar `could not serialize access due to read/write dependencies` num response 500 cru, em vez
-do 409 claro que o lock pessimista já garantia sozinho. Removi o `SERIALIZABLE` — dois
-mecanismos de exclusão mútua empilhados só trocaram uma mensagem de erro legível por uma
-confusa. Testado com 5 requisições concorrentes pelo mesmo assento: 1 sucesso, 4 recusas limpas
-(ver `backend/src/reservations/reservations.service.ts`).
+**Lock pessimista pra travar o assento, não isolamento SERIALIZABLE.** A garantia de "esse
+assento não é vendido duas vezes" vem de um `SELECT ... FOR UPDATE` explícito na linha do
+assento (ou do evento, no caso de pista) dentro da transação — não do nível de isolamento do
+banco. Cheguei a testar empilhando `SERIALIZABLE` por cima desse lock, só pra ver o Postgres
+trocar o 409 claro que eu já tinha por um `could not serialize access due to read/write
+dependencies` cru, direto num 500. Tirei o `SERIALIZABLE` de novo: dois mecanismos de exclusão
+mútua ao mesmo tempo só trocaram um erro legível por um confuso, sem ganhar nada em troca.
+Testei com 5 requisições concorrentes disputando o mesmo assento: 1 passa, 4 recusam limpo (dá
+pra ver em `backend/src/reservations/reservations.service.ts`).
 
-**Hold de 10 minutos com expiração automática.** Sem isso, um cliente que abandona o checkout
-deixaria o assento (ou vaga de pista) preso para sempre. Um cron (`@nestjs/schedule`, a cada
-minuto) devolve ao estoque reservas pendentes cujo prazo expirou.
+**Hold de 10 minutos, com expiração automática.** Sem isso, bastaria um cliente abandonar o
+checkout no meio pra aquele assento (ou vaga de pista) ficar preso pra sempre, sem ninguém mais
+conseguir comprar. Um cron do `@nestjs/schedule` roda a cada minuto e devolve ao estoque
+qualquer reserva pendente cujo prazo já estourou.
 
-**QR não forjável via HMAC, não apenas código aleatório.** O código do ingresso já tem entropia
-alta (10 caracteres, ~50 bits, alfabeto sem caracteres ambíguos para digitação manual). O QR
-carrega adicionalmente uma assinatura HMAC-SHA256 de `id+eventId+code`, calculada com um
-segredo que só o servidor conhece. A portaria valida a assinatura *antes* de consultar o banco —
-um QR com o campo alterado é rejeitado imediatamente como forjado, sem round-trip. Ver
+**QR assinado com HMAC, não só um código aleatório.** O código já vem com bastante entropia (10
+caracteres, ~50 bits, sem letras/números ambíguos pra não confundir na digitação manual), mas
+achei pouco pra dizer que o ingresso "não pode ser forjado". Então o QR carrega junto uma
+assinatura HMAC-SHA256 de `id+eventId+code`, calculada com uma chave que só o servidor conhece.
+Na portaria, a assinatura é conferida *antes* de qualquer consulta ao banco — um QR com algum
+campo trocado já cai como forjado ali, sem nem precisar ir até o banco. Está em
 `backend/src/tickets/ticket-signature.util.ts` e `backend/src/gate/gate.service.ts`.
 
-**Cadastro público só para clientes.** Organizador e portaria são provisionados (seed), não se
-autocadastram por formulário público — como funciona em Sympla/Eventim, onde produtor e equipe
-de portaria são contas geridas pela operação, não autoatendimento.
+**Organizador e portaria não têm cadastro público.** Só o cliente se cadastra pela tela de
+registro; organizador e portaria já vêm criados pelo seed. É assim que funciona na vida real em
+plataformas como Sympla ou Eventim também — quem produz o evento e quem trabalha na portaria são
+contas da operação, não autoatendimento.
 
-**Cartão de teste recusado por convenção, não aleatório.** Números terminados em `0000` são
-sempre recusados; qualquer outro número aprova. Decisão simples e determinística para poder
-testar (e para você conseguir reproduzir) o fluxo de recusa exigido no desafio, sem simular
-gateway de pagamento real.
+**Cartão de teste recusado por convenção, não por sorteio.** Qualquer número terminado em `0000`
+é recusado; todo o resto aprova. Preferi essa regra simples e previsível a um "aleatório às
+vezes" — assim dá pra reproduzir o fluxo de recusa (que o desafio pede) de propósito, em vez de
+ficar tentando a sorte, sem precisar simular um gateway de pagamento de verdade.
 
-**JWT em localStorage, não cookie httpOnly.** Mais simples de implementar dado o prazo, mas
-tecnicamente mais exposto a XSS do que um cookie httpOnly + CSRF token. Limitação conhecida,
-registrada aqui em vez de escondida.
+**Token fica no localStorage, não em cookie httpOnly.** Guardo o JWT via `zustand/persist`. Um
+cookie httpOnly seria mais seguro contra XSS, mas ia exigir CSRF token e configurar cookie
+cross-origin entre o front (Vite) e o back (Nest) — mais trabalho do que cabia no prazo de uma
+semana. Sei que isso deixa a aplicação um pouco mais exposta a XSS; é uma limitação real, e
+prefiro deixar isso claro aqui a fingir que não existe.
 
 
 ## Sobre o histórico de commits
