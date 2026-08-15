@@ -20,6 +20,12 @@ import { ReservationsModule } from './reservations/reservations.module';
 import { TicketsModule } from './tickets/tickets.module';
 import { GateModule } from './gate/gate.module';
 
+function isManagedPostgres(databaseUrl: string | undefined): boolean {
+  if (!databaseUrl) return false;
+  const host = new URL(databaseUrl).hostname;
+  return host !== 'localhost' && host !== '127.0.0.1';
+}
+
 @Module({
   imports: [
     ConfigModule.forRoot({ isGlobal: true }),
@@ -31,6 +37,10 @@ import { GateModule } from './gate/gate.module';
         entities: [User, EventEntity, Seat, Reservation, Ticket, Payment],
         synchronize: true, // desafio de 7 dias: sem migrations formais, ver README
         logging: false,
+        // Postgres gerenciado (Neon/Supabase/Railway etc.) exige TLS; localhost não.
+        ssl: isManagedPostgres(process.env.DATABASE_URL)
+          ? { rejectUnauthorized: false }
+          : false,
       }),
     }),
     AuthModule,

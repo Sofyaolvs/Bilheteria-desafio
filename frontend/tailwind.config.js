@@ -13,9 +13,9 @@ export default {
           dim: '#F1EADA',
         },
         marquee: {
-          DEFAULT: '#4E93C4', // azul de bilheteria — cor de assinatura do produto
-          dark: '#356F9C',
-          light: '#BFDCF0',
+          DEFAULT: '#D9A22C', // dourado de bilheteria — cor de assinatura do produto
+          dark: '#AD7A18',
+          light: '#F3D98A',
         },
         stamp: {
           DEFAULT: '#B33F2E', // carimbo/erro — inspirado em carimbo de "usado"

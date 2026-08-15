@@ -93,6 +93,34 @@ fluxo completo funciona sem depender de uma chave externa. Para usar o catálogo
 2. Coloque em `backend/.env`: `TICKETMASTER_API_KEY=sua-chave`
 3. Reinicie o backend
 
+### 5. Deploy do back-end no Vercel (opcional)
+
+O NestJS por padrão sobe um servidor persistente (`app.listen()`), e o Vercel roda funções
+serverless — cada invocação é um processo isolado que morre depois do request. Para o backend
+rodar lá, ele precisa de um handler serverless em vez do `app.listen()` direto:
+
+- `backend/api/index.ts` monta o app Nest sobre uma instância do Express e expõe um handler
+  `(req, res)`, reaproveitando a mesma instância entre invocações "quentes" do mesmo processo
+  (evita recriar o app do zero a cada request).
+- `backend/vercel.json` roteia todo o tráfego para esse handler.
+
+Ao criar o projeto no Vercel, aponte o **Root Directory** para `backend/` e configure as
+variáveis de ambiente do `.env.example` (`DATABASE_URL`, `JWT_SECRET`, `TICKET_QR_SECRET`, etc.)
+nas configurações do projeto — elas não vêm do `.env` local, que não é versionado.
+
+Se o `DATABASE_URL` apontar para um Postgres gerenciado (Neon, Supabase, Railway...) em vez de
+`localhost`, o backend liga TLS automaticamente na conexão (ver `isManagedPostgres` em
+`backend/src/app.module.ts`) — sem isso a conexão cai e a function crasha com
+`FUNCTION_INVOCATION_FAILED` antes mesmo de responder a primeira rota.
+
+**Limitação conhecida:** o cron de expiração de hold (`@nestjs/schedule`, a cada minuto, ver
+`backend/src/reservations/`) depende de um processo rodando continuamente. Serverless não
+garante isso — o cron só dispara enquanto uma invocação estiver "quente", então reservas
+pendentes podem não expirar sozinhas em produção no Vercel. Para esse cron funcionar de verdade,
+o ideal é um [Vercel Cron Job](https://vercel.com/docs/cron-jobs) batendo numa rota HTTP que
+expira os holds manualmente, ou hospedar o backend em uma plataforma com processo persistente
+(Railway, Render, Fly.io) — não implementado aqui por estar fora do escopo do desafio.
+
 ## Credenciais de teste (semeadas pelo `npm run seed`)
 
 | Papel        | E-mail                  | Senha      |
@@ -130,16 +158,12 @@ Os códigos exatos dos ingressos de demonstração aparecem no terminal ao rodar
 
 ## Decisões de produto e design
 
-**Identidade visual — canhoto de ingresso, não "SaaS genérico".** Em vez do visual que qualquer
-gerador de UI produz hoje (cards com sombra suave e blur, gradiente azul/violeta, `Inter`
-em tudo), a marca do produto é o ingresso físico de bilheteria de cinema: bordas grossas
-sólidas, sombra "dura" deslocada (sem blur), faixa de perfuração pontilhada com círculos entre o
-corpo do ingresso e o canhoto do QR. Paleta dourado-bilheteria (`marquee`) + tinta (`ink`) +
-papel (`paper`), com verde/vermelho de carimbo para os estados de validação — reforça a metáfora
-sem precisar de mais texto. Tipografia em três camadas: `Space Grotesk` para títulos (geométrica,
-com personalidade), `IBM Plex Sans` para texto corrido (legível, mas não o `Inter` que aparece em
-95% das interfaces geradas por IA), `IBM Plex Mono` para códigos/preços/assentos (reforça a
-sensação de "sistema de bilheteria").
+**Identidade visual — canhoto de ingresso.** A marca do produto é o ingresso físico de
+bilheteria de cinema: bordas grossas sólidas, sombra "dura" deslocada (sem blur), faixa de
+perfuração pontilhada com círculos entre o corpo do ingresso e o canhoto do QR. Paleta
+dourado-bilheteria (`marquee`) + tinta (`ink`) + papel (`paper`), com verde/vermelho de carimbo
+para os estados de validação. Tipografia em três camadas: `Space Grotesk` para títulos,
+`IBM Plex Sans` para texto corrido, `IBM Plex Mono` para códigos/preços/assentos.
 
 **Mapa de assentos simplificado (fileiras × poltronas).** Um editor de mapa de assentos livre
 (camarotes, curvas, setores irregulares) é o tipo de feature que consome dias sem agregar ao que
