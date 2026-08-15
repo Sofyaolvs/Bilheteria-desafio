@@ -243,6 +243,13 @@ tecnicamente mais exposto a XSS do que um cookie httpOnly + CSRF token. Limitaç
 registrada aqui em vez de escondida.
 
 
+## Sobre o histórico de commits
+
+O histórico do git não reflete o ritmo real de desenvolvimento: fui construindo o projeto ao
+longo da semana em ambiente local, sem publicar no repositório, e só fiz os
+commits no fim, de uma vez. Não foi a forma ideal nem correta de versionar (normalmente teria comitado por
+etapa, com mensagens mostrando a evolução mas como foi uma semana meio incomum e corrida não consegui), mas o motivo foi só fluxo de trabalho mesmo.
+
 ## Dados sensíveis
 
 Os arquivos `.env` **não** estão versionados (`.gitignore`). Use os `.env.example` de

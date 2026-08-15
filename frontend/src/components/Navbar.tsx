@@ -48,7 +48,7 @@ export function Navbar() {
                 }}
                 className="stub-shadow border-2 border-ink bg-paper px-3 py-1 font-semibold hover:bg-ink hover:text-paper"
               >
-                Saír
+                Sair
               </button>
             </div>
           ) : (
